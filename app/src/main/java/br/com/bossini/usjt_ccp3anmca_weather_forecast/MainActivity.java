@@ -1,5 +1,6 @@
 package br.com.bossini.usjt_ccp3anmca_weather_forecast;
 
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -10,7 +11,20 @@ import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.EditText;
+import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,11 +33,13 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView weatherRecyclerView;
     private WeatherAdapter weatherAdapter;
     private List<Weather> previsoes;
+    private EditText locationEditText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        locationEditText = findViewById(R.id.locationEditText);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -54,31 +70,142 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                String nomeCidade =
+                        locationEditText.getEditableText().toString();
+                obtemPrevisoesV3(nomeCidade);
             }
         });
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+    public void obtemPrevisoesV3 (String cidade){
+        new Thread(()-> {
+            String endereco = getString(
+                    R.string.web_service_url,
+                    cidade,
+                    getString(R.string.api_key)
+            );
+            try {
+                URL url = new URL (endereco);
+                HttpURLConnection conn =
+                        (HttpURLConnection) url.openConnection();
+                InputStream is = conn.getInputStream();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+                StringBuilder resultado = new StringBuilder ("");
+                String aux = null;
+                while ((aux = reader.readLine()) != null)
+                    resultado.append(aux);
+                reader.close();
+                conn.disconnect();
+                runOnUiThread(() -> {
+                    lidaComJSON(resultado.toString());
+                    //Toast.makeText(this, resultado.toString(), Toast.LENGTH_SHORT).show();
+                });
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
+    class ObtemPrevisoes extends AsyncTask <String, Void, String>{
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+        @Override
+        protected String doInBackground(String... enderecos) {
+            String endereco = enderecos[0];
+            try {
+                URL url = new URL (endereco);
+                HttpURLConnection conn =
+                        (HttpURLConnection) url.openConnection();
+                InputStream is = conn.getInputStream();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+                StringBuilder resultado = new StringBuilder ("");
+                String aux = null;
+                while ((aux = reader.readLine()) != null)
+                    resultado.append(aux);
+                reader.close();
+                conn.disconnect();
+                return resultado.toString();
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+                return null;
+            }
+
         }
 
-        return super.onOptionsItemSelected(item);
+        @Override
+        protected void onPostExecute(String resultado) {
+            lidaComJSON(resultado);
+        }
+    }
+    public void lidaComJSON (String resultado){
+        try {
+            previsoes.clear();
+            JSONObject json = new JSONObject(resultado);
+            JSONArray list = json.getJSONArray("list");
+            for (int i = 0; i < list.length(); i++){
+                JSONObject caraDaVez = list.getJSONObject(i);
+                long dt = caraDaVez.getLong("dt");
+                JSONObject main = caraDaVez.getJSONObject("main");
+                double temp_min = main.getDouble("temp_min");
+                double temp_max = main.getDouble("temp_max");
+                double humidity = main.getDouble("humidity");
+                String description =
+                        caraDaVez.
+                        getJSONArray("weather").
+                                getJSONObject(0).
+                                getString("description");
+                String icon =
+                        caraDaVez.
+                                getJSONArray("weather").
+                                getJSONObject(0).
+                                getString("icon");
+                Weather w =
+                        new Weather(dt, description, temp_min, temp_max, humidity, icon);
+                previsoes.add(w);
+            }
+            weatherAdapter.notifyDataSetChanged();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void obtemPrevisoesV2 (String cidade){
+        new Thread(()-> {
+            String endereco = getString(
+                    R.string.web_service_url,
+                    cidade,
+                    getString(R.string.api_key)
+            );
+            try {
+                URL url = new URL (endereco);
+                HttpURLConnection conn =
+                        (HttpURLConnection) url.openConnection();
+                InputStream is = conn.getInputStream();
+                Toast.makeText(this, "acabou...", Toast.LENGTH_SHORT).show();
+
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    public void obtemPrevisoesV1 (String cidade){
+        String endereco = getString(
+                R.string.web_service_url,
+                cidade,
+                getString(R.string.api_key)
+        );
+        try {
+            URL url = new URL (endereco);
+            HttpURLConnection conn =
+                    (HttpURLConnection) url.openConnection();
+            InputStream is = conn.getInputStream();
+
+        }
+        catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
     }
 }
