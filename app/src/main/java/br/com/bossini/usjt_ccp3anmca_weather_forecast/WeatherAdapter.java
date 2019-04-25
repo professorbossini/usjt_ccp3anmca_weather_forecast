@@ -9,6 +9,8 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.bumptech.glide.Glide;
+
 import org.w3c.dom.Text;
 
 import java.util.List;
@@ -35,6 +37,7 @@ public class WeatherAdapter
     @Override
     public void onBindViewHolder(@NonNull WeatherViewHolder weatherViewHolder, int i) {
         Weather caraDaVez = previsoes.get(i);
+        Glide.with(context).load(caraDaVez.iconURL).into(weatherViewHolder.conditionImageView);
         weatherViewHolder.dayTextView.setText(
                 context.getString(
                         R.string.day_description,

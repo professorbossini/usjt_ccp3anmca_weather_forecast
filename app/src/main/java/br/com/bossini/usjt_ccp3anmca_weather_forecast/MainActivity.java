@@ -14,6 +14,11 @@ import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -34,11 +39,13 @@ public class MainActivity extends AppCompatActivity {
     private WeatherAdapter weatherAdapter;
     private List<Weather> previsoes;
     private EditText locationEditText;
+    private RequestQueue requestQueue;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        requestQueue = Volley.newRequestQueue(this);
         locationEditText = findViewById(R.id.locationEditText);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -72,9 +79,39 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 String nomeCidade =
                         locationEditText.getEditableText().toString();
-                obtemPrevisoesV3(nomeCidade);
+                obtemPrevisoesV5(nomeCidade);
             }
         });
+    }
+    public void obtemPrevisoesV5 (String cidade){
+        String endereco = getString(
+                R.string.web_service_url,
+                cidade,
+                getString(R.string.api_key)
+        );
+        JsonObjectRequest req = new JsonObjectRequest(
+                Request.Method.GET,
+                endereco,
+                null,
+                (response) ->{
+                    lidaComJSON(response);
+                },
+                (error) -> {
+                    Toast.makeText(this,
+                            getString(R.string.connect_error) + error.getLocalizedMessage(),
+                            Toast.LENGTH_SHORT).show();
+                }
+        );
+        requestQueue.add(req);
+
+    }
+    public void obtemPrevisoesV4 (String cidade){
+        String endereco = getString(
+                R.string.web_service_url,
+                cidade,
+                getString(R.string.api_key)
+        );
+        new ObtemPrevisoes().execute(endereco);
     }
 
     public void obtemPrevisoesV3 (String cidade){
@@ -138,11 +175,11 @@ public class MainActivity extends AppCompatActivity {
             lidaComJSON(resultado);
         }
     }
-    public void lidaComJSON (String resultado){
+
+    public void lidaComJSON (JSONObject resultado){
         try {
             previsoes.clear();
-            JSONObject json = new JSONObject(resultado);
-            JSONArray list = json.getJSONArray("list");
+            JSONArray list = resultado.getJSONArray("list");
             for (int i = 0; i < list.length(); i++){
                 JSONObject caraDaVez = list.getJSONObject(i);
                 long dt = caraDaVez.getLong("dt");
@@ -152,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
                 double humidity = main.getDouble("humidity");
                 String description =
                         caraDaVez.
-                        getJSONArray("weather").
+                                getJSONArray("weather").
                                 getJSONObject(0).
                                 getString("description");
                 String icon =
@@ -165,6 +202,14 @@ public class MainActivity extends AppCompatActivity {
                 previsoes.add(w);
             }
             weatherAdapter.notifyDataSetChanged();
+            
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+    public void lidaComJSON (String resultado){
+        try {
+            lidaComJSON(new JSONObject(resultado));
         } catch (JSONException e) {
             e.printStackTrace();
         }
